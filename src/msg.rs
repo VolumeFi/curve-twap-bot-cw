@@ -18,6 +18,7 @@ pub enum ExecuteMsg {
 #[cw_serde]
 pub struct Deposit {
     pub deposit_id: u32,
+    pub remaining_count: u32,
     pub amount_out_min: Uint256,
 }
 
