@@ -63,6 +63,11 @@ fn swap(deps: DepsMut, deposits: Vec<Deposit>) -> Result<Response<PalomaMsg>, Co
                         internal_type: None,
                     },
                     Param {
+                        name: "remaining_counts".to_string(),
+                        kind: ParamType::Array(Box::new(ParamType::Uint(256))),
+                        internal_type: None,
+                    },
+                    Param {
                         name: "amount_out_min".to_string(),
                         kind: ParamType::Array(Box::new(ParamType::Uint(256))),
                         internal_type: None,
@@ -80,17 +85,20 @@ fn swap(deps: DepsMut, deposits: Vec<Deposit>) -> Result<Response<PalomaMsg>, Co
     };
 
     let mut tokens_id: Vec<Token> = vec![];
+    let mut tokens_remaining_counts: Vec<Token> = vec![];
     let mut tokens_min_amount: Vec<Token> = vec![];
     for deposit in deposits {
         let deposit_id = deposit.deposit_id;
+        let remaining_count = deposit.remaining_count;
         let amount_out_min = deposit.amount_out_min;
         tokens_id.push(Token::Uint(Uint::from_big_endian(&deposit_id.to_be_bytes())));
+        tokens_remaining_counts.push(Token::Uint(Uint::from_big_endian(&remaining_count.to_be_bytes())));
         tokens_min_amount.push(Token::Uint(Uint::from_big_endian(
             &amount_out_min.to_be_bytes(),
         )));
     }
 
-    let tokens = vec![Token::Array(tokens_id), Token::Array(tokens_min_amount)];
+    let tokens = vec![Token::Array(tokens_id), Token::Array(tokens_remaining_counts), Token::Array(tokens_min_amount)];
     let state = STATE.load(deps.storage)?;
     Ok(Response::new()
         .add_message(CosmosMsg::Custom(PalomaMsg {

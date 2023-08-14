@@ -1,1 +1,1 @@
-ccc2bf2dd3b785c9edb5752e4cc6f935a69eab0fa2761e4b69cbf4140b618708  /target/wasm32-unknown-unknown/release/curve_dca_bot_cw.wasm
+9dba4c195b1af473dd72bcc5d861b1afa88106b792af5e9cfa305765b0a3942b  /target/wasm32-unknown-unknown/release/curve_dca_bot_cw.wasm
