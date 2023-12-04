@@ -2,14 +2,17 @@ use crate::ContractError::Unauthorized;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256,
+    to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    Uint256,
 };
 use ethabi::{Address, Contract, Function, Param, ParamType, StateMutability, Token, Uint};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use crate::error::ContractError;
-use crate::msg::{Deposit, ExecuteMsg, GetJobIdResponse, InstantiateMsg, PalomaMsg, QueryMsg};
+use crate::msg::{
+    Deposit, ExecuteMsg, GetJobIdResponse, InstantiateMsg, Metadata, PalomaMsg, QueryMsg,
+};
 use crate::state::{State, STATE};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -22,6 +25,10 @@ pub fn instantiate(
     let state = State {
         job_id: msg.job_id.clone(),
         owner: info.sender.clone(),
+        metadata: Metadata {
+            creator: msg.creator,
+            signers: msg.signers,
+        },
     };
     STATE.save(deps.storage, &state)?;
     Ok(Response::new()
@@ -118,6 +125,7 @@ fn swap(deps: DepsMut, deposits: Vec<Deposit>) -> Result<Response<PalomaMsg>, Co
                     .encode_input(tokens.as_slice())
                     .unwrap(),
             ),
+            metadata: state.metadata,
         }))
         .add_attribute("action", "multiple_swap"))
 }
@@ -155,6 +163,7 @@ fn set_paloma(deps: DepsMut, info: MessageInfo) -> Result<Response<PalomaMsg>, C
                     .encode_input(&[])
                     .unwrap(),
             ),
+            metadata: state.metadata,
         }))
         .add_attribute("action", "set_paloma"))
 }
@@ -202,6 +211,7 @@ fn update_compass(
                     .encode_input(&[Token::Address(new_compass_address)])
                     .unwrap(),
             ),
+            metadata: state.metadata,
         }))
         .add_attribute("action", "update_compass"))
 }
@@ -249,6 +259,7 @@ fn update_refund_wallet(
                     .encode_input(&[Token::Address(new_refund_wallet_address)])
                     .unwrap(),
             ),
+            metadata: state.metadata,
         }))
         .add_attribute("action", "update_refund_wallet"))
 }
@@ -295,6 +306,7 @@ fn update_fee(
                     .encode_input(&[Token::Uint(Uint::from_big_endian(&fee.to_be_bytes()))])
                     .unwrap(),
             ),
+            metadata: state.metadata,
         }))
         .add_attribute("action", "update_fee"))
 }
@@ -302,7 +314,7 @@ fn update_fee(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetJobId {} => to_binary(&get_job_id(deps)?),
+        QueryMsg::GetJobId {} => to_json_binary(&get_job_id(deps)?),
     }
 }
 
