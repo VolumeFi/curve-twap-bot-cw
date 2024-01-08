@@ -1,3 +1,4 @@
+use crate::ContractError::AllPending;
 use crate::ContractError::Unauthorized;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -13,7 +14,7 @@ use crate::error::ContractError;
 use crate::msg::{
     Deposit, ExecuteMsg, GetJobIdResponse, InstantiateMsg, Metadata, PalomaMsg, QueryMsg,
 };
-use crate::state::{State, STATE};
+use crate::state::{State, STATE, WITHDRAW_TIMESTAMP};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -23,6 +24,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
+        retry_delay: msg.retry_delay,
         job_id: msg.job_id.clone(),
         owner: info.sender.clone(),
         metadata: Metadata {
@@ -40,12 +42,12 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response<PalomaMsg>, ContractError> {
     match msg {
-        ExecuteMsg::PutSwap { deposits } => swap(deps, deposits),
+        ExecuteMsg::PutSwap { deposits } => swap(deps, env, deposits),
         ExecuteMsg::SetPaloma {} => set_paloma(deps, info),
         ExecuteMsg::UpdateCompass { new_compass } => update_compass(deps, info, new_compass),
         ExecuteMsg::UpdateRefundWallet { new_refund_wallet } => {
@@ -55,7 +57,11 @@ pub fn execute(
     }
 }
 
-fn swap(deps: DepsMut, deposits: Vec<Deposit>) -> Result<Response<PalomaMsg>, ContractError> {
+fn swap(
+    deps: DepsMut,
+    env: Env,
+    deposits: Vec<Deposit>,
+) -> Result<Response<PalomaMsg>, ContractError> {
     #[allow(deprecated)]
     let contract: Contract = Contract {
         constructor: None,
@@ -94,40 +100,73 @@ fn swap(deps: DepsMut, deposits: Vec<Deposit>) -> Result<Response<PalomaMsg>, Co
     let mut tokens_id: Vec<Token> = vec![];
     let mut tokens_remaining_counts: Vec<Token> = vec![];
     let mut tokens_min_amount: Vec<Token> = vec![];
+    let state = STATE.load(deps.storage)?;
     for deposit in deposits {
         let deposit_id = deposit.deposit_id;
         let remaining_count = deposit.remaining_count;
         let amount_out_min = deposit.amount_out_min;
-        tokens_id.push(Token::Uint(Uint::from_big_endian(
-            &deposit_id.to_be_bytes(),
-        )));
-        tokens_remaining_counts.push(Token::Uint(Uint::from_big_endian(
-            &remaining_count.to_be_bytes(),
-        )));
-        tokens_min_amount.push(Token::Uint(Uint::from_big_endian(
-            &amount_out_min.to_be_bytes(),
-        )));
+        if let Some(timestamp) =
+            WITHDRAW_TIMESTAMP.may_load(deps.storage, (deposit_id, remaining_count))?
+        {
+            if timestamp
+                .plus_seconds(state.retry_delay)
+                .lt(&env.block.time)
+            {
+                tokens_id.push(Token::Uint(Uint::from_big_endian(
+                    &deposit_id.to_be_bytes(),
+                )));
+                tokens_remaining_counts.push(Token::Uint(Uint::from_big_endian(
+                    &remaining_count.to_be_bytes(),
+                )));
+                tokens_min_amount.push(Token::Uint(Uint::from_big_endian(
+                    &amount_out_min.to_be_bytes(),
+                )));
+            }
+            WITHDRAW_TIMESTAMP.save(
+                deps.storage,
+                (deposit_id, remaining_count),
+                &env.block.time,
+            )?;
+        } else {
+            tokens_id.push(Token::Uint(Uint::from_big_endian(
+                &deposit_id.to_be_bytes(),
+            )));
+            tokens_remaining_counts.push(Token::Uint(Uint::from_big_endian(
+                &remaining_count.to_be_bytes(),
+            )));
+            tokens_min_amount.push(Token::Uint(Uint::from_big_endian(
+                &amount_out_min.to_be_bytes(),
+            )));
+            WITHDRAW_TIMESTAMP.save(
+                deps.storage,
+                (deposit_id, remaining_count),
+                &env.block.time,
+            )?;
+        }
     }
+    if tokens_id.is_empty() {
+        Err(AllPending {})
+    } else {
+        let tokens = vec![
+            Token::Array(tokens_id),
+            Token::Array(tokens_remaining_counts),
+            Token::Array(tokens_min_amount),
+        ];
 
-    let tokens = vec![
-        Token::Array(tokens_id),
-        Token::Array(tokens_remaining_counts),
-        Token::Array(tokens_min_amount),
-    ];
-    let state = STATE.load(deps.storage)?;
-    Ok(Response::new()
-        .add_message(CosmosMsg::Custom(PalomaMsg {
-            job_id: state.job_id,
-            payload: Binary(
-                contract
-                    .function("multiple_swap")
-                    .unwrap()
-                    .encode_input(tokens.as_slice())
-                    .unwrap(),
-            ),
-            metadata: state.metadata,
-        }))
-        .add_attribute("action", "multiple_swap"))
+        Ok(Response::new()
+            .add_message(CosmosMsg::Custom(PalomaMsg {
+                job_id: state.job_id,
+                payload: Binary(
+                    contract
+                        .function("multiple_swap")
+                        .unwrap()
+                        .encode_input(tokens.as_slice())
+                        .unwrap(),
+                ),
+                metadata: state.metadata,
+            }))
+            .add_attribute("action", "multiple_swap"))
+    }
 }
 
 fn set_paloma(deps: DepsMut, info: MessageInfo) -> Result<Response<PalomaMsg>, ContractError> {

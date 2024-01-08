@@ -3,6 +3,7 @@ use cosmwasm_std::{Binary, CustomMsg, Uint256};
 
 #[cw_serde]
 pub struct InstantiateMsg {
+    pub retry_delay: u64,
     pub job_id: String,
     pub creator: String,
     pub signers: Vec<String>,
