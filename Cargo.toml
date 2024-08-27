@@ -1,5 +1,5 @@
 [package]
-name = "curve-dca-bot-cw"
+name = "curve-twap-bot-cw"
 version = "0.1.0"
 authors = ["VolumeFi"]
 edition = "2021"
@@ -27,8 +27,6 @@ incremental = false
 overflow-checks = true
 
 [features]
-# for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 
@@ -36,20 +34,18 @@ library = []
 optimize = """docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.15.0
+  cosmwasm/rust-optimizer:0.16.0
 """
 
 [dependencies]
-cosmwasm-schema = "1.5.0"
-cosmwasm-std = "1.5.0"
-cosmwasm-storage = "1.5.0"
-cw-storage-plus = "1.2.0"
-cw2 = "1.1.2"
+cosmwasm-schema = "2.1.3"
+cosmwasm-std = "2.1.3"
+cw-storage-plus = "2.0.0"
 ethabi = "18.0.0"
-schemars = "0.8.16"
-serde = { version = "1.0.193", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.50" }
-getrandom = { version = "0.2.11", features = ["custom"] }
+schemars = "0.8.21"
+serde = { version = "1.0.209", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.63" }
+getrandom = { version = "0.2.15", features = ["custom"] }
 
 [dev-dependencies]
-cw-multi-test = "0.16.5"
+cw-multi-test = "2.1.1"

@@ -16,6 +16,7 @@ pub enum ExecuteMsg {
     UpdateCompass { new_compass: String },
     UpdateRefundWallet { new_refund_wallet: String },
     UpdateFee { fee: Uint256 },
+    UpdateJobId { new_job_id: String },
 }
 
 #[cw_serde]

@@ -1,1 +1,1 @@
-9bbcb93ef6e2984d41a6dc18b79a2c06b3c4fec65789ddbda07fd920d8c5d62e  curve_dca_bot_cw.wasm
+015b45f2043c3154158f545308b43230559c8d7ca6a0cbd385ec0552ab46321e  curve_twap_bot_cw.wasm
